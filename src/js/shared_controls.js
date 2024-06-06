@@ -577,182 +577,239 @@ function smogonAnalysis(pokemonName) {
 	return "https://smogon.com/dex/" + generation + "/pokemon/" + pokemonName.toLowerCase() + "/";
 }
 
+function getTrainerPokemon(trainerName) {
+	const groupedByTrainer = {};
+	const pokemonData = setdex;
+	for (const pokemon in pokemonData) {
+		for (const pokemonTrainer in pokemonData[pokemon]) {
+				if (pokemonData[pokemon].hasOwnProperty(pokemonTrainer)) {
+						const trainerDetails = pokemonData[pokemon][pokemonTrainer];
+						if (!groupedByTrainer[pokemonTrainer]) {
+								groupedByTrainer[pokemonTrainer] = [];
+						}
+						groupedByTrainer[pokemonTrainer].push({ [pokemon]: trainerDetails, trainer: pokemonTrainer });
+				}
+		}
+	}
+	return groupedByTrainer[trainerName];
+}
+
+function displayTrainerPokemon(trainerPokemon, pokeObj) {
+	const trainerPokemonList = pokeObj.find(".trainerPokemonList");
+
+	trainerPokemon.forEach((item) => {
+		const pokemonName = Object.keys(item)[0];
+		const fullSetName = `${pokemonName} (${item.trainer})`
+
+		const button = $("<button>", {
+			class: "trainer-pokemon-btn",
+			id: fullSetName,
+			text: pokemonName
+		});
+		trainerPokemonList.append(button);
+	});
+}
+
+function displayAndCalc(fullSetName, pokemonName, setName, pokemon, pokeObj){
+	var isAutoTera =
+	(startsWith(pokemonName, "Ogerpon") && endsWith(pokemonName, "Tera")) ||
+	pokemonName === 'Terapagos-Stellar';
+	if (stickyMoves.getSelectedSide() === pokeObj.prop("id")) {
+		stickyMoves.clearStickyMove();
+	}
+	pokeObj.find(".teraToggle").prop("checked", isAutoTera);
+	stellarButtonsVisibility(pokeObj, 0);
+	pokeObj.find(".boostedStat").val("");
+	pokeObj.find(".analysis").attr("href", smogonAnalysis(pokemonName));
+	pokeObj.find(".type1").val(pokemon.types[0]);
+	pokeObj.find(".type2").val(pokemon.types[1]);
+	pokeObj.find(".hp .base").val(pokemon.bs.hp);
+	pokeObj.find(".trainerPokemonList").empty();
+
+	if (setName !== "Blank Set") {
+		var trainerPokemon = getTrainerPokemon(setName, fullSetName);
+		displayTrainerPokemon(trainerPokemon, pokeObj);
+	}
+	var i;
+	for (i = 0; i < LEGACY_STATS[gen].length; i++) {
+		pokeObj.find("." + LEGACY_STATS[gen][i] + " .base").val(pokemon.bs[LEGACY_STATS[gen][i]]);
+	}
+	pokeObj.find(".boost").val(0);
+	pokeObj.find(".percent-hp").val(100);
+	pokeObj.find(".status").val("Healthy");
+	$(".status").change();
+	var moveObj;
+	var abilityObj = pokeObj.find(".ability");
+	var itemObj = pokeObj.find(".item");
+	var randset = $("#randoms").prop("checked") ? randdex[pokemonName] : undefined;
+	var regSets = pokemonName in setdex && setName in setdex[pokemonName];
+
+	if (randset) {
+		var listItems = randdex[pokemonName].items ? randdex[pokemonName].items : [];
+		var listAbilities = randdex[pokemonName].abilities ? randdex[pokemonName].abilities : [];
+		if (gen >= 3) $(this).closest('.poke-info').find(".ability-pool").show();
+		$(this).closest('.poke-info').find(".extraSetAbilities").text(listAbilities.join(', '));
+		if (gen >= 2) $(this).closest('.poke-info').find(".item-pool").show();
+		$(this).closest('.poke-info').find(".extraSetItems").text(listItems.join(', '));
+		if (gen >= 9 || gen === 7 || gen === 6 || gen === 5 || gen === 4 || gen === 3) {
+			$(this).closest('.poke-info').find(".role-pool").show();
+			if (gen >= 9) $(this).closest('.poke-info').find(".tera-type-pool").show();
+		}
+		var listRoles = randdex[pokemonName].roles ? Object.keys(randdex[pokemonName].roles) : [];
+		$(this).closest('.poke-info').find(".extraSetRoles").text(listRoles.join(', '));
+		var listTeraTypes = [];
+		if (randdex[pokemonName].roles && gen >= 9) {
+			for (var roleName in randdex[pokemonName].roles) {
+				var role = randdex[pokemonName].roles[roleName];
+				for (var q = 0; q < role.teraTypes.length; q++) {
+					if (listTeraTypes.indexOf(role.teraTypes[q]) === -1) {
+						listTeraTypes.push(role.teraTypes[q]);
+					}
+				}
+			}
+		}
+		pokeObj.find(".teraType").val(listTeraTypes[0] || getForcedTeraType(pokemonName) || pokemon.types[0]);
+		$(this).closest('.poke-info').find(".extraSetTeraTypes").text(listTeraTypes.join(', '));
+	} else {
+		$(this).closest('.poke-info').find(".ability-pool").hide();
+		$(this).closest('.poke-info').find(".item-pool").hide();
+		$(this).closest('.poke-info').find(".role-pool").hide();
+		$(this).closest('.poke-info').find(".tera-type-pool").hide();
+	}
+	if (regSets || randset) {
+		var set = regSets ? correctHiddenPower(setdex[pokemonName][setName]) : randset;
+		if (regSets) {
+			pokeObj.find(".teraType").val(set.teraType || getForcedTeraType(pokemonName) || pokemon.types[0]);
+		}
+		pokeObj.find(".level").val(set.level === undefined ? 100 : set.level);
+		pokeObj.find(".hp .evs").val((set.evs && set.evs.hp !== undefined) ? set.evs.hp : 0);
+		pokeObj.find(".hp .ivs").val((set.ivs && set.ivs.hp !== undefined) ? set.ivs.hp : 31);
+		pokeObj.find(".hp .dvs").val((set.dvs && set.dvs.hp !== undefined) ? set.dvs.hp : 15);
+		for (i = 0; i < LEGACY_STATS[gen].length; i++) {
+			pokeObj.find("." + LEGACY_STATS[gen][i] + " .evs").val(
+				(set.evs && set.evs[LEGACY_STATS[gen][i]] !== undefined) ?
+					set.evs[LEGACY_STATS[gen][i]] : ($("#randoms").prop("checked") ? 84 : 0));
+			pokeObj.find("." + LEGACY_STATS[gen][i] + " .ivs").val(
+				(set.ivs && set.ivs[LEGACY_STATS[gen][i]] !== undefined) ? set.ivs[LEGACY_STATS[gen][i]] : 31);
+			pokeObj.find("." + LEGACY_STATS[gen][i] + " .dvs").val(
+				(set.dvs && set.dvs[LEGACY_STATS[gen][i]] !== undefined) ? set.dvs[LEGACY_STATS[gen][i]] : 15);
+		}
+		setSelectValueIfValid(pokeObj.find(".nature"), set.nature, "Hardy");
+		var abilityFallback = (typeof pokemon.abilities !== "undefined") ? pokemon.abilities[0] : "";
+		if ($("#randoms").prop("checked")) {
+			setSelectValueIfValid(abilityObj, randset.abilities && randset.abilities[0], abilityFallback);
+			setSelectValueIfValid(itemObj, randset.items && randset.items[0], "");
+		} else {
+			setSelectValueIfValid(abilityObj, set.ability, abilityFallback);
+			setSelectValueIfValid(itemObj, set.item, "");
+		}
+		var setMoves = set.moves;
+		if (randset) {
+			if (gen < 9 && gen !== 7 && gen !== 6 && gen !== 5 && gen !== 4 && gen !== 3) {
+				setMoves = randset.moves;
+			} else {
+				setMoves = [];
+				for (var role in randset.roles) {
+					for (var q = 0; q < randset.roles[role].moves.length; q++) {
+						var moveName = randset.roles[role].moves[q];
+						if (setMoves.indexOf(moveName) === -1) setMoves.push(moveName);
+					}
+				}
+			}
+		}
+		var moves = selectMovesFromRandomOptions(setMoves);
+		for (i = 0; i < 4; i++) {
+			moveObj = pokeObj.find(".move" + (i + 1) + " select.move-selector");
+			moveObj.attr('data-prev', moveObj.val());
+			setSelectValueIfValid(moveObj, moves[i], "(No Move)");
+			moveObj.change();
+		}
+		if (randset) {
+			$(this).closest('.poke-info').find(".move-pool").show();
+			$(this).closest('.poke-info').find(".extraSetMoves").html(formatMovePool(setMoves));
+		}
+	} else {
+		pokeObj.find(".teraType").val(getForcedTeraType(pokemonName) || pokemon.types[0]);
+		pokeObj.find(".level").val(defaultLevel);
+		pokeObj.find(".hp .evs").val(0);
+		pokeObj.find(".hp .ivs").val(31);
+		pokeObj.find(".hp .dvs").val(15);
+		for (i = 0; i < LEGACY_STATS[gen].length; i++) {
+			pokeObj.find("." + LEGACY_STATS[gen][i] + " .evs").val(0);
+			pokeObj.find("." + LEGACY_STATS[gen][i] + " .ivs").val(31);
+			pokeObj.find("." + LEGACY_STATS[gen][i] + " .dvs").val(15);
+		}
+		pokeObj.find(".nature").val("Hardy");
+		setSelectValueIfValid(abilityObj, pokemon.abilities[0], "");
+		if (startsWith(pokemonName, "Ogerpon-") && !startsWith(pokemonName, "Ogerpon-Teal")) {
+			itemObj.val(pokemonName.split("-")[1] + " Mask");
+		} else {
+			itemObj.val("");
+		}
+		for (i = 0; i < 4; i++) {
+			moveObj = pokeObj.find(".move" + (i + 1) + " select.move-selector");
+			moveObj.attr('data-prev', moveObj.val());
+			moveObj.val("(No Move)");
+			moveObj.change();
+		}
+		if ($("#randoms").prop("checked")) {
+			$(this).closest('.poke-info').find(".move-pool").hide();
+		}
+	}
+	if (typeof getSelectedTiers === "function") { // doesn't exist when in 1vs1 mode
+		var format = getSelectedTiers()[0];
+		var is50lvl = startsWith(format, "VGC") || startsWith(format, "Battle Spot");
+		//var isDoubles = format === 'Doubles' || has50lvl; *TODO*
+		if (format === "LC") pokeObj.find(".level").val(5);
+		if (is50lvl) pokeObj.find(".level").val(50);
+		//if (isDoubles) field.gameType = 'Doubles'; *TODO*
+	}
+	var formeObj = $(this).siblings().find(".forme").parent();
+	itemObj.prop("disabled", false);
+	var baseForme;
+	if (pokemon.baseSpecies && pokemon.baseSpecies !== pokemon.name) {
+		baseForme = pokedex[pokemon.baseSpecies];
+	}
+	if (pokemon.otherFormes) {
+		showFormes(formeObj, pokemonName, pokemon, pokemonName);
+	} else if (baseForme && baseForme.otherFormes) {
+		showFormes(formeObj, pokemonName, baseForme, pokemon.baseSpecies);
+	} else {
+		formeObj.hide();
+	}
+	calcHP(pokeObj);
+	calcStats(pokeObj);
+	abilityObj.change();
+	itemObj.change();
+	if (pokemon.gender === "N") {
+		pokeObj.find(".gender").parent().hide();
+		pokeObj.find(".gender").val("");
+	} else pokeObj.find(".gender").parent().show();
+}
+
+$(document).on("click", ".trainer-pokemon-btn", function (event) {
+	const selectPokemon = event.currentTarget.id;
+	var fullSetName = selectPokemon
+	var pokemonName = fullSetName.substring(0, fullSetName.indexOf(" ("));
+	var setName = fullSetName.substring(fullSetName.indexOf("(") + 1, fullSetName.lastIndexOf(")"));
+	var pokemon = pokedex[pokemonName];
+	if (pokemon) {
+		var pokeObj = $(this).closest(".poke-info");
+		pokeObj.find(".select2-chosen").text(selectPokemon);
+		displayAndCalc(fullSetName, pokemonName, setName, pokemon, pokeObj)
+	}
+});
+
 // auto-update set details on select
 $(".set-selector").change(function () {
 	var fullSetName = $(this).val();
 	var pokemonName = fullSetName.substring(0, fullSetName.indexOf(" ("));
 	var setName = fullSetName.substring(fullSetName.indexOf("(") + 1, fullSetName.lastIndexOf(")"));
 	var pokemon = pokedex[pokemonName];
+
 	if (pokemon) {
 		var pokeObj = $(this).closest(".poke-info");
-		var isAutoTera =
-		(startsWith(pokemonName, "Ogerpon") && endsWith(pokemonName, "Tera")) ||
-		pokemonName === 'Terapagos-Stellar';
-		if (stickyMoves.getSelectedSide() === pokeObj.prop("id")) {
-			stickyMoves.clearStickyMove();
-		}
-		pokeObj.find(".teraToggle").prop("checked", isAutoTera);
-		stellarButtonsVisibility(pokeObj, 0);
-		pokeObj.find(".boostedStat").val("");
-		pokeObj.find(".analysis").attr("href", smogonAnalysis(pokemonName));
-		pokeObj.find(".type1").val(pokemon.types[0]);
-		pokeObj.find(".type2").val(pokemon.types[1]);
-		pokeObj.find(".hp .base").val(pokemon.bs.hp);
-		var i;
-		for (i = 0; i < LEGACY_STATS[gen].length; i++) {
-			pokeObj.find("." + LEGACY_STATS[gen][i] + " .base").val(pokemon.bs[LEGACY_STATS[gen][i]]);
-		}
-		pokeObj.find(".boost").val(0);
-		pokeObj.find(".percent-hp").val(100);
-		pokeObj.find(".status").val("Healthy");
-		$(".status").change();
-		var moveObj;
-		var abilityObj = pokeObj.find(".ability");
-		var itemObj = pokeObj.find(".item");
-		var randset = $("#randoms").prop("checked") ? randdex[pokemonName] : undefined;
-		var regSets = pokemonName in setdex && setName in setdex[pokemonName];
-
-		if (randset) {
-			var listItems = randdex[pokemonName].items ? randdex[pokemonName].items : [];
-			var listAbilities = randdex[pokemonName].abilities ? randdex[pokemonName].abilities : [];
-			if (gen >= 3) $(this).closest('.poke-info').find(".ability-pool").show();
-			$(this).closest('.poke-info').find(".extraSetAbilities").text(listAbilities.join(', '));
-			if (gen >= 2) $(this).closest('.poke-info').find(".item-pool").show();
-			$(this).closest('.poke-info').find(".extraSetItems").text(listItems.join(', '));
-			if (gen >= 9 || gen === 7 || gen === 6 || gen === 5 || gen === 4 || gen === 3) {
-				$(this).closest('.poke-info').find(".role-pool").show();
-				if (gen >= 9) $(this).closest('.poke-info').find(".tera-type-pool").show();
-			}
-			var listRoles = randdex[pokemonName].roles ? Object.keys(randdex[pokemonName].roles) : [];
-			$(this).closest('.poke-info').find(".extraSetRoles").text(listRoles.join(', '));
-			var listTeraTypes = [];
-			if (randdex[pokemonName].roles && gen >= 9) {
-				for (var roleName in randdex[pokemonName].roles) {
-					var role = randdex[pokemonName].roles[roleName];
-					for (var q = 0; q < role.teraTypes.length; q++) {
-						if (listTeraTypes.indexOf(role.teraTypes[q]) === -1) {
-							listTeraTypes.push(role.teraTypes[q]);
-						}
-					}
-				}
-			}
-			pokeObj.find(".teraType").val(listTeraTypes[0] || getForcedTeraType(pokemonName) || pokemon.types[0]);
-			$(this).closest('.poke-info').find(".extraSetTeraTypes").text(listTeraTypes.join(', '));
-		} else {
-			$(this).closest('.poke-info').find(".ability-pool").hide();
-			$(this).closest('.poke-info').find(".item-pool").hide();
-			$(this).closest('.poke-info').find(".role-pool").hide();
-			$(this).closest('.poke-info').find(".tera-type-pool").hide();
-		}
-		if (regSets || randset) {
-			var set = regSets ? correctHiddenPower(setdex[pokemonName][setName]) : randset;
-			if (regSets) {
-				pokeObj.find(".teraType").val(set.teraType || getForcedTeraType(pokemonName) || pokemon.types[0]);
-			}
-			pokeObj.find(".level").val(set.level === undefined ? 100 : set.level);
-			pokeObj.find(".hp .evs").val((set.evs && set.evs.hp !== undefined) ? set.evs.hp : 0);
-			pokeObj.find(".hp .ivs").val((set.ivs && set.ivs.hp !== undefined) ? set.ivs.hp : 31);
-			pokeObj.find(".hp .dvs").val((set.dvs && set.dvs.hp !== undefined) ? set.dvs.hp : 15);
-			for (i = 0; i < LEGACY_STATS[gen].length; i++) {
-				pokeObj.find("." + LEGACY_STATS[gen][i] + " .evs").val(
-					(set.evs && set.evs[LEGACY_STATS[gen][i]] !== undefined) ?
-						set.evs[LEGACY_STATS[gen][i]] : ($("#randoms").prop("checked") ? 84 : 0));
-				pokeObj.find("." + LEGACY_STATS[gen][i] + " .ivs").val(
-					(set.ivs && set.ivs[LEGACY_STATS[gen][i]] !== undefined) ? set.ivs[LEGACY_STATS[gen][i]] : 31);
-				pokeObj.find("." + LEGACY_STATS[gen][i] + " .dvs").val(
-					(set.dvs && set.dvs[LEGACY_STATS[gen][i]] !== undefined) ? set.dvs[LEGACY_STATS[gen][i]] : 15);
-			}
-			setSelectValueIfValid(pokeObj.find(".nature"), set.nature, "Hardy");
-			var abilityFallback = (typeof pokemon.abilities !== "undefined") ? pokemon.abilities[0] : "";
-			if ($("#randoms").prop("checked")) {
-				setSelectValueIfValid(abilityObj, randset.abilities && randset.abilities[0], abilityFallback);
-				setSelectValueIfValid(itemObj, randset.items && randset.items[0], "");
-			} else {
-				setSelectValueIfValid(abilityObj, set.ability, abilityFallback);
-				setSelectValueIfValid(itemObj, set.item, "");
-			}
-			var setMoves = set.moves;
-			if (randset) {
-				if (gen < 9 && gen !== 7 && gen !== 6 && gen !== 5 && gen !== 4 && gen !== 3) {
-					setMoves = randset.moves;
-				} else {
-					setMoves = [];
-					for (var role in randset.roles) {
-						for (var q = 0; q < randset.roles[role].moves.length; q++) {
-							var moveName = randset.roles[role].moves[q];
-							if (setMoves.indexOf(moveName) === -1) setMoves.push(moveName);
-						}
-					}
-				}
-			}
-			var moves = selectMovesFromRandomOptions(setMoves);
-			for (i = 0; i < 4; i++) {
-				moveObj = pokeObj.find(".move" + (i + 1) + " select.move-selector");
-				moveObj.attr('data-prev', moveObj.val());
-				setSelectValueIfValid(moveObj, moves[i], "(No Move)");
-				moveObj.change();
-			}
-			if (randset) {
-				$(this).closest('.poke-info').find(".move-pool").show();
-				$(this).closest('.poke-info').find(".extraSetMoves").html(formatMovePool(setMoves));
-			}
-		} else {
-			pokeObj.find(".teraType").val(getForcedTeraType(pokemonName) || pokemon.types[0]);
-			pokeObj.find(".level").val(defaultLevel);
-			pokeObj.find(".hp .evs").val(0);
-			pokeObj.find(".hp .ivs").val(31);
-			pokeObj.find(".hp .dvs").val(15);
-			for (i = 0; i < LEGACY_STATS[gen].length; i++) {
-				pokeObj.find("." + LEGACY_STATS[gen][i] + " .evs").val(0);
-				pokeObj.find("." + LEGACY_STATS[gen][i] + " .ivs").val(31);
-				pokeObj.find("." + LEGACY_STATS[gen][i] + " .dvs").val(15);
-			}
-			pokeObj.find(".nature").val("Hardy");
-			setSelectValueIfValid(abilityObj, pokemon.abilities[0], "");
-			if (startsWith(pokemonName, "Ogerpon-") && !startsWith(pokemonName, "Ogerpon-Teal")) {
-				itemObj.val(pokemonName.split("-")[1] + " Mask");
-			} else {
-				itemObj.val("");
-			}
-			for (i = 0; i < 4; i++) {
-				moveObj = pokeObj.find(".move" + (i + 1) + " select.move-selector");
-				moveObj.attr('data-prev', moveObj.val());
-				moveObj.val("(No Move)");
-				moveObj.change();
-			}
-			if ($("#randoms").prop("checked")) {
-				$(this).closest('.poke-info').find(".move-pool").hide();
-			}
-		}
-		if (typeof getSelectedTiers === "function") { // doesn't exist when in 1vs1 mode
-			var format = getSelectedTiers()[0];
-			var is50lvl = startsWith(format, "VGC") || startsWith(format, "Battle Spot");
-			//var isDoubles = format === 'Doubles' || has50lvl; *TODO*
-			if (format === "LC") pokeObj.find(".level").val(5);
-			if (is50lvl) pokeObj.find(".level").val(50);
-			//if (isDoubles) field.gameType = 'Doubles'; *TODO*
-		}
-		var formeObj = $(this).siblings().find(".forme").parent();
-		itemObj.prop("disabled", false);
-		var baseForme;
-		if (pokemon.baseSpecies && pokemon.baseSpecies !== pokemon.name) {
-			baseForme = pokedex[pokemon.baseSpecies];
-		}
-		if (pokemon.otherFormes) {
-			showFormes(formeObj, pokemonName, pokemon, pokemonName);
-		} else if (baseForme && baseForme.otherFormes) {
-			showFormes(formeObj, pokemonName, baseForme, pokemon.baseSpecies);
-		} else {
-			formeObj.hide();
-		}
-		calcHP(pokeObj);
-		calcStats(pokeObj);
-		abilityObj.change();
-		itemObj.change();
-		if (pokemon.gender === "N") {
-			pokeObj.find(".gender").parent().hide();
-			pokeObj.find(".gender").val("");
-		} else pokeObj.find(".gender").parent().show();
+		displayAndCalc(fullSetName, pokemonName, setName, pokemon, pokeObj)
 	}
 });
 
