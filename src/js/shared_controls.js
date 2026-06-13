@@ -577,6 +577,10 @@ function smogonAnalysis(pokemonName) {
 	return "https://smogon.com/dex/" + generation + "/pokemon/" + pokemonName.toLowerCase() + "/";
 }
 
+$(".zero-ev-toggle").change(function () {
+    $(this).closest(".poke-info").find(".set-selector").trigger("change");
+  });
+
 // auto-update set details on select
 $(".set-selector").change(function () {
 	var fullSetName = $(this).val();
@@ -645,7 +649,32 @@ $(".set-selector").change(function () {
 			$(this).closest('.poke-info').find(".tera-type-pool").hide();
 		}
 		if (regSets || randset) {
-			var set = regSets ? correctHiddenPower(setdex[pokemonName][setName]) : randset;
+			const originalSetRaw = regSets
+				? correctHiddenPower(setdex[pokemonName][setName])
+				: randset;
+
+			const pokeObj = $(this).closest(".poke-info");
+
+			// Check the checkbox state
+			const zeroEV = pokeObj.find(".zero-ev-toggle").prop("checked");
+			
+			const fullSetName = $(this).val();
+			const lastSetName = pokeObj.data("lastSetName");
+
+			if (lastSetName !== fullSetName) {
+				// New Pokemon or new set -> reset stored version
+				pokeObj.data("originalSet", JSON.parse(JSON.stringify(originalSetRaw)));
+				pokeObj.data("lastSetName", fullSetName)
+			}
+
+			// Use a deep copy of the stored original
+			const originalSet = pokeObj.data("originalSet");
+			const set = JSON.parse(JSON.stringify(originalSet)); // deep copy
+
+			// Override EVs if checkbox is checked
+			if (zeroEV) {
+				set.evs = {hp:0, atk:0, def:0, spa:0, spd:0, spe:0};
+			}
 			if (regSets) {
 				pokeObj.find(".teraType").val(set.teraType || getForcedTeraType(pokemonName) || pokemon.types[0]);
 			}
