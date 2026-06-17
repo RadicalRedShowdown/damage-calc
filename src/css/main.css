@@ -528,3 +528,7 @@ table.field {
 .extraSetMoves {
     width: 100%;
 }
+.trainer-selector {
+    width: 100%;
+    margin-bottom: 4px;
+}
